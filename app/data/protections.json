@@ -1,0 +1,11 @@
+[ {
+  "reservationId" : "RES-4ebf9b8e",
+  "insuranceCost" : 0.10,
+  "depositAmount" : 100000,
+  "status" : "DEPOSIT_HELD"
+}, {
+  "reservationId" : "RES-15c1dd09",
+  "insuranceCost" : 2000.00,
+  "depositAmount" : 100000,
+  "status" : "RELEASED"
+} ]

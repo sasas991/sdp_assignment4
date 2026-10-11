@@ -1,0 +1,17 @@
+[ {
+  "workflowId" : "WF-3ad5489d",
+  "reservationId" : "RES-4ebf9b8e",
+  "status" : "COMPLETED"
+}, {
+  "workflowId" : "WF-0ca88da1",
+  "reservationId" : "RES-99828ae7",
+  "status" : "COMPENSATED"
+}, {
+  "workflowId" : "WF-76fa0945",
+  "reservationId" : "RES-e8f07b41",
+  "status" : "COMPENSATED"
+}, {
+  "workflowId" : "WF-8b9da18e",
+  "reservationId" : "RES-15c1dd09",
+  "status" : "COMPENSATED"
+} ]

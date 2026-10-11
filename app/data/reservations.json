@@ -1,0 +1,21 @@
+[ {
+  "reservationId" : "RES-4ebf9b8e",
+  "vehicleId" : "1",
+  "rentalDays" : 1,
+  "status" : "RESERVED"
+}, {
+  "reservationId" : "RES-99828ae7",
+  "vehicleId" : "2",
+  "rentalDays" : 2,
+  "status" : "RELEASED"
+}, {
+  "reservationId" : "RES-e8f07b41",
+  "vehicleId" : "2",
+  "rentalDays" : 1,
+  "status" : "RELEASED"
+}, {
+  "reservationId" : "RES-15c1dd09",
+  "vehicleId" : "3",
+  "rentalDays" : 1,
+  "status" : "RELEASED"
+} ]
