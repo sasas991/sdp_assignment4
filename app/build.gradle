@@ -23,7 +23,7 @@ java {
 }
 
 application {
-    mainClass = 'org.example.App'
+    mainClass = 'com.carrental.Main'
 }
 
 tasks.named('test') {
@@ -35,4 +35,8 @@ jacocoTestReport {
     reports {
         html.required = true
     }
+}
+
+tasks.named('run') {
+    standardInput = System.in
 }
