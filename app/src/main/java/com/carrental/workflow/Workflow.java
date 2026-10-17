@@ -1,4 +1,7 @@
+
 package com.carrental.workflow;
+
+import java.math.BigDecimal;
 
 public class Workflow {
 
@@ -12,6 +15,12 @@ public class Workflow {
     private final String workflowId;
     private final String reservationId;
     private Status status;
+
+    private String vehicleId;
+    private int rentalDays;
+    private BigDecimal dailyRate;
+    private BigDecimal depositAmount;
+    private String damageLevel;
 
     public Workflow(String workflowId, String reservationId) {
         this(workflowId, reservationId, Status.PENDING_B);
@@ -53,15 +62,58 @@ public class Workflow {
         return new Workflow(workflowId, reservationId, status);
     }
 
+    public void setRentalDetails(
+            String vehicleId,
+            int rentalDays,
+            BigDecimal dailyRate,
+            BigDecimal depositAmount,
+            String damageLevel
+    ) {
+        if (vehicleId == null || vehicleId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "vehicle ID is required"
+            );
+        }
+
+        if (rentalDays <= 0) {
+            throw new IllegalArgumentException(
+                    "rental days must be positive"
+            );
+        }
+
+        if (dailyRate == null || dailyRate.signum() <= 0) {
+            throw new IllegalArgumentException(
+                    "daily rate must be positive"
+            );
+        }
+
+        if (depositAmount == null
+                || depositAmount.signum() <= 0) {
+            throw new IllegalArgumentException(
+                    "deposit amount must be positive"
+            );
+        }
+
+        if (damageLevel == null || damageLevel.isBlank()) {
+            throw new IllegalArgumentException(
+                    "damage level is required"
+            );
+        }
+
+        this.vehicleId = vehicleId;
+        this.rentalDays = rentalDays;
+        this.dailyRate = dailyRate;
+        this.depositAmount = depositAmount;
+        this.damageLevel = damageLevel;
+    }
+
     public void markPendingC() {
         requireStatus(Status.PENDING_B);
-
         status = Status.PENDING_C;
     }
 
     public void complete() {
         requireStatus(Status.PENDING_C);
-
         status = Status.COMPLETED;
     }
 
@@ -95,5 +147,25 @@ public class Workflow {
 
     public Status getStatus() {
         return status;
+    }
+
+    public String getVehicleId() {
+        return vehicleId;
+    }
+
+    public int getRentalDays() {
+        return rentalDays;
+    }
+
+    public BigDecimal getDailyRate() {
+        return dailyRate;
+    }
+
+    public BigDecimal getDepositAmount() {
+        return depositAmount;
+    }
+
+    public String getDamageLevel() {
+        return damageLevel;
     }
 }

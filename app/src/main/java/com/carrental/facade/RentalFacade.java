@@ -1,3 +1,4 @@
+
 package com.carrental.facade;
 
 import java.math.BigDecimal;
@@ -73,6 +74,9 @@ public class RentalFacade {
         this.workflowRepository = workflowRepository;
     }
 
+    /**
+     * Runs the complete rental process: A -> B -> C.
+     */
     public Workflow rent(
             String workflowId,
             String reservationId,
@@ -82,16 +86,43 @@ public class RentalFacade {
             BigDecimal depositAmount,
             DamageInspector.DamageLevel damageLevel
     ) {
-        RentalReservation reservation =
-                new RentalReservation(
-                        reservationId,
-                        vehicleId,
-                        rentalDays
-                );
+        Workflow workflow = startRental(
+                workflowId,
+                reservationId,
+                vehicleId,
+                rentalDays,
+                dailyRate,
+                depositAmount,
+                damageLevel
+        );
 
-        Workflow workflow =
-                new Workflow(workflowId, reservationId);
+        BigDecimal rentalPrice = pricingEngine.calculateTotalPrice(
+                rentalDays,
+                dailyRate
+        );
 
+        continueWorkflow(
+                workflow,
+                rentalPrice,
+                damageLevel
+        );
+
+        return workflow;
+    }
+
+    /**
+     * Executes only subsystem A and persists the workflow.
+     * Subsystems B and C are not executed yet.
+     */
+    public Workflow startRental(
+            String workflowId,
+            String reservationId,
+            String vehicleId,
+            int rentalDays,
+            BigDecimal dailyRate,
+            BigDecimal depositAmount,
+            DamageInspector.DamageLevel damageLevel
+    ) {
         if (depositAmount == null || depositAmount.signum() <= 0) {
             throw new IllegalArgumentException(
                     "deposit amount must be positive"
@@ -104,12 +135,23 @@ public class RentalFacade {
             );
         }
 
+        // Validate rental parameters before changing persisted state.
+        BigDecimal rentalPrice = pricingEngine.calculateTotalPrice(
+                rentalDays,
+                dailyRate
+        );
+
+        RentalReservation reservation = new RentalReservation(
+                reservationId,
+                vehicleId,
+                rentalDays
+        );
+
         List<RentalReservation> reservations =
                 reservationRepository.findAll();
 
         if (reservations.stream().anyMatch(
-                item -> item.getReservationId()
-                        .equals(reservationId))) {
+                item -> item.getReservationId().equals(reservationId))) {
             throw new IllegalArgumentException(
                     "reservation ID already exists"
             );
@@ -128,81 +170,177 @@ public class RentalFacade {
             );
         }
 
-        BigDecimal rentalPrice =
-                pricingEngine.calculateTotalPrice(
-                        rentalDays,
-                        dailyRate
-                );
-
+        // Stage A: reserve the vehicle and persist the reservation.
         reservation.reserve();
         reservationRepository.save(reservation);
+
+        // Persist the workflow and all parameters required for resuming.
+        Workflow workflow = new Workflow(
+                workflowId,
+                reservationId
+        );
+
+        workflow.setRentalDetails(
+                vehicleId,
+                rentalDays,
+                dailyRate,
+                depositAmount,
+                damageLevel.name()
+        );
+
         workflowRepository.save(workflow);
 
-        try {
-            BigDecimal insuranceCost =
-                    insuranceCalculator.calculateInsurance(rentalPrice);
+        System.out.println(
+                "stage A completed. Workflow saved with status: "
+                        + workflow.getStatus()
+        );
 
-            InsuranceDeposit protection =
-                    new InsuranceDeposit(
-                            reservationId,
-                            insuranceCost,
-                            depositAmount
-                    );
+        return workflow;
+    }
 
-            protection.approveInsurance();
-            depositHandler.hold(protection);
-            protectionRepository.save(protection);
+    /**
+     * Resumes a saved workflow after an application restart.
+     */
+    public Workflow resume(String workflowId) {
+        Workflow workflow = workflowRepository.findAll()
+                .stream()
+                .filter(item -> item.getWorkflowId().equals(workflowId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "workflow not found: " + workflowId
+                ));
 
-            workflow.markPendingC();
-            workflowRepository.save(workflow);
+        if (workflow.getStatus() == Workflow.Status.COMPLETED) {
+            return workflow;
+        }
 
-        } catch (RuntimeException failure) {
-            compensate(workflowId);
-
+        if (workflow.getStatus() == Workflow.Status.COMPENSATED) {
             throw new IllegalStateException(
-                    "subsystem B failed. reservation A was compensated.",
-                    failure
+                    "a compensated workflow cannot be resumed"
             );
         }
 
-        try {
-            VehicleHandover handover =
-                    new VehicleHandover(reservationId, vehicleId);
+        if (workflow.getVehicleId() == null
+                || workflow.getDailyRate() == null
+                || workflow.getDepositAmount() == null
+                || workflow.getDamageLevel() == null
+                || workflow.getRentalDays() <= 0) {
+            throw new IllegalStateException(
+                    "workflow does not contain rental details"
+            );
+        }
 
-            if (!damageInspector.canHandOver(damageLevel)) {
-                handover.reject();
-                handoverRepository.save(handover);
+        BigDecimal rentalPrice = pricingEngine.calculateTotalPrice(
+                workflow.getRentalDays(),
+                workflow.getDailyRate()
+        );
+
+        DamageInspector.DamageLevel damageLevel =
+                DamageInspector.DamageLevel.valueOf(
+                        workflow.getDamageLevel()
+                );
+
+        continueWorkflow(
+                workflow,
+                rentalPrice,
+                damageLevel
+        );
+
+        return workflow;
+    }
+
+    private void continueWorkflow(
+            Workflow workflow,
+            BigDecimal rentalPrice,
+            DamageInspector.DamageLevel damageLevel
+    ) {
+        if (workflow.getStatus() == Workflow.Status.PENDING_B) {
+            try {
+                executeSubsystemB(
+                        workflow,
+                        rentalPrice,
+                        workflow.getDepositAmount()
+                );
+
+                workflow.markPendingC();
+                workflowRepository.save(workflow);
+
+            } catch (RuntimeException failure) {
+                compensate(workflow.getWorkflowId());
 
                 throw new IllegalStateException(
-                        "serious vehicle damage detected"
+                        "subsystem B failed. reservation A was compensated.",
+                        failure
                 );
             }
+        }
 
-            handover.markInspected();
-            handoverRepository.save(handover);
+        if (workflow.getStatus() == Workflow.Status.PENDING_C) {
+            try {
+                executeSubsystemC(workflow, damageLevel);
 
-            gpsTracker.startTracking(vehicleId);
+                workflow.complete();
+                workflowRepository.save(workflow);
 
-            handover.complete();
-            handoverRepository.save(handover);
+            } catch (RuntimeException failure) {
+                if (gpsTracker.isTracking(workflow.getVehicleId())) {
+                    gpsTracker.stopTracking(workflow.getVehicleId());
+                }
 
-            workflow.complete();
-            workflowRepository.save(workflow);
+                compensate(workflow.getWorkflowId());
 
-            return workflow;
-
-        } catch (RuntimeException failure) {
-            if (gpsTracker.isTracking(vehicleId)) {
-                gpsTracker.stopTracking(vehicleId);
+                throw new IllegalStateException(
+                        "subsystem C failed. subsystems B and A were compensated.",
+                        failure
+                );
             }
+        }
+    }
 
-            compensate(workflowId);
+    private void executeSubsystemB(
+            Workflow workflow,
+            BigDecimal rentalPrice,
+            BigDecimal depositAmount
+    ) {
+        BigDecimal insuranceCost =
+                insuranceCalculator.calculateInsurance(rentalPrice);
+
+        InsuranceDeposit protection = new InsuranceDeposit(
+                workflow.getReservationId(),
+                insuranceCost,
+                depositAmount
+        );
+
+        protection.approveInsurance();
+        depositHandler.hold(protection);
+        protectionRepository.save(protection);
+    }
+
+    private void executeSubsystemC(
+            Workflow workflow,
+            DamageInspector.DamageLevel damageLevel
+    ) {
+        VehicleHandover handover = new VehicleHandover(
+                workflow.getReservationId(),
+                workflow.getVehicleId()
+        );
+
+        if (!damageInspector.canHandOver(damageLevel)) {
+            handover.reject();
+            handoverRepository.save(handover);
 
             throw new IllegalStateException(
-                    "subsystem C failed. subsystems B and A were compensated.",
-                    failure
+                    "serious vehicle damage detected"
             );
         }
+
+        handover.markInspected();
+        handoverRepository.save(handover);
+
+        gpsTracker.startTracking(workflow.getVehicleId());
+
+        handover.complete();
+        handoverRepository.save(handover);
     }
 
     public Workflow compensate(String workflowId) {

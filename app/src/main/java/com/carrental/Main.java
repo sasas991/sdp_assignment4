@@ -1,3 +1,4 @@
+
 package com.carrental;
 
 import java.math.BigDecimal;
@@ -28,6 +29,7 @@ public class Main {
                 System.out.println("3. demo: C fails after A and B");
                 System.out.println("4. inspect persisted state");
                 System.out.println("5. manually compensate a workflow");
+                System.out.println("6. resume a saved workflow");
                 System.out.println("0. exit");
                 System.out.print("Choose: ");
 
@@ -36,26 +38,51 @@ public class Main {
                 try {
                     switch (choice) {
                         case "1" -> createRental(
-                                scanner, rentalFacade, adminFacade,
-                                DamageInspector.DamageLevel.NONE, false
+                                scanner,
+                                rentalFacade,
+                                adminFacade,
+                                DamageInspector.DamageLevel.NONE,
+                                false
                         );
+
                         case "2" -> createRental(
-                                scanner, rentalFacade, adminFacade,
-                                DamageInspector.DamageLevel.NONE, true
+                                scanner,
+                                rentalFacade,
+                                adminFacade,
+                                DamageInspector.DamageLevel.NONE,
+                                true
                         );
+
                         case "3" -> createRental(
-                                scanner, rentalFacade, adminFacade,
-                                DamageInspector.DamageLevel.SERIOUS, false
+                                scanner,
+                                rentalFacade,
+                                adminFacade,
+                                DamageInspector.DamageLevel.SERIOUS,
+                                false
                         );
+
                         case "4" -> inspectState(adminFacade);
+
                         case "5" -> manualCompensation(
-                                scanner, adminFacade
+                                scanner,
+                                adminFacade
                         );
+
+                        case "6" -> resumeWorkflow(
+                                scanner,
+                                rentalFacade
+                        );
+
                         case "0" -> running = false;
-                        default -> System.out.println("invalid menu option");
+
+                        default -> System.out.println(
+                                "invalid menu option"
+                        );
                     }
                 } catch (RuntimeException e) {
-                    System.out.println("operation failed: " + e.getMessage());
+                    System.out.println(
+                            "operation failed: " + e.getMessage()
+                    );
                 }
             }
         }
@@ -71,9 +98,15 @@ public class Main {
             boolean forceBFailure
     ) {
         String vehicleId = readText(scanner, "vehicle ID: ");
-        int rentalDays = readPositiveInt(scanner, "rental days: ");
+
+        int rentalDays = readPositiveInt(
+                scanner,
+                "rental days: "
+        );
+
         BigDecimal dailyRate = readPositiveMoney(
-                scanner, "daily rate: "
+                scanner,
+                "daily rate: "
         );
 
         BigDecimal deposit = forceBFailure
@@ -104,11 +137,14 @@ public class Main {
             );
 
             System.out.println(
-                    "rental completed. status: " + workflow.getStatus()
+                    "rental completed. status: "
+                            + workflow.getStatus()
             );
 
         } catch (RuntimeException e) {
-            System.out.println("rental failed: " + e.getMessage());
+            System.out.println(
+                    "rental failed: " + e.getMessage()
+            );
 
             if (e.getCause() != null) {
                 System.out.println(
@@ -117,18 +153,42 @@ public class Main {
             }
 
             try {
-                Workflow workflow = admin.inspectWorkflow(workflowId);
+                Workflow workflow =
+                        admin.inspectWorkflow(workflowId);
+
                 System.out.println(
-                        "persisted workflow status: " + workflow.getStatus()
+                        "persisted workflow status: "
+                                + workflow.getStatus()
                 );
             } catch (RuntimeException ignored) {
-                System.out.println("workflow could not be reloaded.");
+                System.out.println(
+                        "workflow could not be reloaded."
+                );
             }
         }
     }
 
-    private static void inspectState(RentalAdminFacade admin) {
+    private static void resumeWorkflow(
+            Scanner scanner,
+            RentalFacade facade
+    ) {
+        String workflowId = readText(
+                scanner,
+                "workflow ID to resume: "
+        );
+
+        Workflow workflow = facade.resume(workflowId);
+
+        System.out.println(
+                "workflow status: " + workflow.getStatus()
+        );
+    }
+
+    private static void inspectState(
+            RentalAdminFacade admin
+    ) {
         System.out.println("\nworkflows");
+
         for (Workflow item : admin.listWorkflows()) {
             System.out.println(
                     item.getWorkflowId() + " | "
@@ -138,6 +198,7 @@ public class Main {
         }
 
         System.out.println("\nreservations");
+
         for (RentalReservation item : admin.listReservations()) {
             System.out.println(
                     item.getReservationId() + " | "
@@ -147,6 +208,7 @@ public class Main {
         }
 
         System.out.println("\ninsurance and deposits");
+
         for (InsuranceDeposit item : admin.listProtections()) {
             System.out.println(
                     item.getReservationId() + " | "
@@ -156,6 +218,7 @@ public class Main {
         }
 
         System.out.println("\nhandovers");
+
         for (VehicleHandover item : admin.listHandovers()) {
             System.out.println(
                     item.getReservationId() + " | "
@@ -170,7 +233,8 @@ public class Main {
             RentalAdminFacade admin
     ) {
         String workflowId = readText(
-                scanner, "workflow ID to compensate: "
+                scanner,
+                "workflow ID to compensate: "
         );
 
         Workflow workflow = admin.manuallyCompensate(workflowId);
@@ -182,24 +246,30 @@ public class Main {
 
     private static String newId(String prefix) {
         return prefix + "-"
-                + UUID.randomUUID().toString().substring(0, 8);
+                + UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8);
     }
 
     private static String readText(
-            Scanner scanner, String prompt
+            Scanner scanner,
+            String prompt
     ) {
         System.out.print(prompt);
         return scanner.nextLine().trim();
     }
 
     private static int readPositiveInt(
-            Scanner scanner, String prompt
+            Scanner scanner,
+            String prompt
     ) {
         while (true) {
             System.out.print(prompt);
 
             try {
-                int value = Integer.parseInt(scanner.nextLine().trim());
+                int value = Integer.parseInt(
+                        scanner.nextLine().trim()
+                );
 
                 if (value > 0) {
                     return value;
@@ -207,12 +277,15 @@ public class Main {
             } catch (NumberFormatException ignored) {
             }
 
-            System.out.println("enter a positive whole number.");
+            System.out.println(
+                    "enter a positive whole number."
+            );
         }
     }
 
     private static BigDecimal readPositiveMoney(
-            Scanner scanner, String prompt
+            Scanner scanner,
+            String prompt
     ) {
         while (true) {
             System.out.print(prompt);
@@ -228,7 +301,7 @@ public class Main {
             } catch (NumberFormatException ignored) {
             }
 
-            System.out.println("enter a positive amount");
+            System.out.println("enter a positive amount.");
         }
     }
 }

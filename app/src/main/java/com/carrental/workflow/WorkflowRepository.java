@@ -1,6 +1,8 @@
+
 package com.carrental.workflow;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -39,18 +41,36 @@ public class WorkflowRepository {
             List<Workflow> workflows = new ArrayList<>();
 
             for (StoredWorkflow record : records) {
-                workflows.add(Workflow.restore(
+                Workflow workflow = Workflow.restore(
                         record.workflowId,
                         record.reservationId,
                         Workflow.Status.valueOf(record.status)
-                ));
+                );
+
+                if (record.vehicleId != null
+                        && record.rentalDays > 0
+                        && record.dailyRate != null
+                        && record.depositAmount != null
+                        && record.damageLevel != null) {
+
+                    workflow.setRentalDetails(
+                            record.vehicleId,
+                            record.rentalDays,
+                            record.dailyRate,
+                            record.depositAmount,
+                            record.damageLevel
+                    );
+                }
+
+                workflows.add(workflow);
             }
 
             return workflows;
 
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "failed to load workflows", e
+                    "Failed to load workflows",
+                    e
             );
         }
     }
@@ -63,6 +83,7 @@ public class WorkflowRepository {
         for (int i = 0; i < workflows.size(); i++) {
             if (workflows.get(i).getWorkflowId()
                     .equals(workflow.getWorkflowId())) {
+
                 workflows.set(i, workflow);
                 updated = true;
                 break;
@@ -79,7 +100,12 @@ public class WorkflowRepository {
             records.add(new StoredWorkflow(
                     item.getWorkflowId(),
                     item.getReservationId(),
-                    item.getStatus().name()
+                    item.getStatus().name(),
+                    item.getVehicleId(),
+                    item.getRentalDays(),
+                    item.getDailyRate(),
+                    item.getDepositAmount(),
+                    item.getDamageLevel()
             ));
         }
 
@@ -94,15 +120,23 @@ public class WorkflowRepository {
 
         } catch (IOException e) {
             throw new IllegalStateException(
-                    "failed to save workflows", e
+                    "Failed to save workflows",
+                    e
             );
         }
     }
 
     public static class StoredWorkflow {
+
         public String workflowId;
         public String reservationId;
         public String status;
+
+        public String vehicleId;
+        public int rentalDays;
+        public BigDecimal dailyRate;
+        public BigDecimal depositAmount;
+        public String damageLevel;
 
         public StoredWorkflow() {
         }
@@ -110,11 +144,21 @@ public class WorkflowRepository {
         public StoredWorkflow(
                 String workflowId,
                 String reservationId,
-                String status
+                String status,
+                String vehicleId,
+                int rentalDays,
+                BigDecimal dailyRate,
+                BigDecimal depositAmount,
+                String damageLevel
         ) {
             this.workflowId = workflowId;
             this.reservationId = reservationId;
             this.status = status;
+            this.vehicleId = vehicleId;
+            this.rentalDays = rentalDays;
+            this.dailyRate = dailyRate;
+            this.depositAmount = depositAmount;
+            this.damageLevel = damageLevel;
         }
     }
 }
