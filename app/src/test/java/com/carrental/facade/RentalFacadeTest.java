@@ -174,4 +174,84 @@ class RentalFacadeTest {
                 workflows().findAll().get(0).getStatus()
         );
     }
+
+        @Test
+        void aSuccessfulRentalCompletesAllThreeSubsystems() {
+        RentalFacade facade = newFacade();
+
+        Workflow result = facade.rent(
+                "WF-OK",
+                "RES-OK",
+                "CAR-OK",
+                2,
+                new BigDecimal("20000"),
+                new BigDecimal("100000"),
+                DamageInspector.DamageLevel.NONE
+        );
+
+        assertEquals(
+                Workflow.Status.COMPLETED,
+                result.getStatus()
+        );
+
+        assertEquals(
+                RentalReservation.Status.RESERVED,
+                reservations().findAll().get(0).getStatus()
+        );
+
+        assertEquals(
+                InsuranceDeposit.Status.DEPOSIT_HELD,
+                protections().findAll().get(0).getStatus()
+        );
+
+        assertEquals(
+                VehicleHandover.Status.COMPLETED,
+                handovers().findAll().get(0).getStatus()
+        );
+
+        assertEquals(
+                Workflow.Status.COMPLETED,
+                workflows().findAll().get(0).getStatus()
+        );
+        }
+
+@Test
+void aSavedWorkflowResumesAfterRestart() {
+    RentalFacade firstFacade = newFacade();
+
+    firstFacade.startRental(
+            "WF-RESUME",
+            "RES-RESUME",
+            "CAR-RESUME",
+            2,
+            new BigDecimal("20000"),
+            new BigDecimal("100000"),
+            DamageInspector.DamageLevel.NONE
+    );
+
+    RentalFacade restartedFacade = newFacade();
+
+    Workflow result = restartedFacade.resume("WF-RESUME");
+
+    assertEquals(
+            Workflow.Status.COMPLETED,
+            result.getStatus()
+    );
+
+    assertEquals(
+            Workflow.Status.COMPLETED,
+            workflows().findAll().get(0).getStatus()
+    );
+
+    assertEquals(
+            InsuranceDeposit.Status.DEPOSIT_HELD,
+            protections().findAll().get(0).getStatus()
+    );
+
+    assertEquals(
+            VehicleHandover.Status.COMPLETED,
+            handovers().findAll().get(0).getStatus()
+    );
+}
+
 }
