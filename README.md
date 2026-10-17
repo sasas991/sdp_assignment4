@@ -103,6 +103,11 @@ A Facade provides a simpler, unified interface to a group of subsystems. Here, `
 
 An Adapter has a different purpose: it makes an existing interface compatible with another interface expected by a client. This application needs coordination of several business steps, not interface conversion, so Facade is the appropriate pattern.
 
+## UML Diagram
+
+![uml](uml.png)
+
+
 ## Testing
 
 JUnit 5 tests cover business rules, status transitions, persistence, workflow recovery and both compensation scenarios. Each persistence test uses temporary storage to remain independent.
